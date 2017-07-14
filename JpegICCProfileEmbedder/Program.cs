@@ -24,7 +24,7 @@ namespace JpegICCProfileEmbedder
         static byte[] App0Marker = { 0xFF, 0xE0 }; // APP0 marker
         static byte[] App2Marker = { 0xFF, 0xE2 }; // APP2 marker
         static byte[] JFIFIdentify = { 0x4A, 0x46, 0x49, 0x46, 0x00 }; // "JFIF\0"
-        static byte[] ICC_PROFILE_Identify = { 0x49, 0x43, 0x43, 0x5F, 0x50, 0x52, 0x4f , 0x46, 0x49, 0x4C, 0x45, 0x00, 0x01, 0x01}; // "ICC_PROFILE\0"
+        static byte[] ICC_PROFILE_Identify = { 0x49, 0x43, 0x43, 0x5F, 0x50, 0x52, 0x4f , 0x46, 0x49, 0x4C, 0x45, 0x00, 0x01, 0x01 }; // "ICC_PROFILE\0"
 
         private static bool InsertICCProfileInJpegFile(string srcPath, string ICCProfilePath)
         {
@@ -52,7 +52,7 @@ namespace JpegICCProfileEmbedder
                 var App0HeaderSize = BitConverter.ToInt16(App0.Skip(SOI.Length + App0Marker.Length).Take(SegmentLengthSize).Reverse().ToArray(), 0); // Reverse is requried for endian
 
                 byte[] ICCProfileSizeBuffer = new byte[SegmentLengthSize];
-                int ICCProfileSize = (int)(fsICCProfile.Length + ICC_PROFILE_Identify.Length);
+                int ICCProfileSize = (int)(fsICCProfile.Length + ICC_PROFILE_Identify.Length + SegmentLengthSize);
                 ICCProfileSizeBuffer[0] = BitConverter.GetBytes(ICCProfileSize)[1];
                 ICCProfileSizeBuffer[1] = BitConverter.GetBytes(ICCProfileSize)[0];
 
@@ -70,9 +70,11 @@ namespace JpegICCProfileEmbedder
                 var JpegImageDataLength = (int)(msJpegImageWithoutHeader.Length - (App0HeaderSize + SOI.Length + App0Marker.Length));
                 fsJpegImage.Write(msJpegImageWithoutHeader.GetBuffer(), SOI.Length + App0Marker.Length + App0HeaderSize, JpegImageDataLength);
 
-                System.Diagnostics.Debug.WriteLine($"{originalFileSize} + {originalICCProfileSize} = {originalFileSize + originalICCProfileSize} : {fsJpegImage.Length} - {expectedFileSize}");
-                System.Diagnostics.Debug.WriteLine($"diff {(originalFileSize + originalICCProfileSize +  ICC_PROFILE_Identify.Length + SegmentLengthSize + App2Marker.Length) - originalFileSize}");
-                System.Diagnostics.Debug.WriteLine($"diff {(originalFileSize + originalICCProfileSize + ICC_PROFILE_Identify.Length + SegmentLengthSize + App2Marker.Length) - fsJpegImage.Length}");
+                System.Diagnostics.Debug.WriteLine($"Original file size : {originalFileSize}");
+                System.Diagnostics.Debug.WriteLine($"ICC Profile file size : {originalICCProfileSize}");
+                System.Diagnostics.Debug.WriteLine($"profile is embedded : {fsJpegImage.Length}");
+                System.Diagnostics.Debug.WriteLine($"ICC profile Identify size : {ICC_PROFILE_Identify.Length}");
+                System.Diagnostics.Debug.WriteLine($"App2 Marker size : {App2Marker.Length}");
                 ret = true;
             }
             return ret;
