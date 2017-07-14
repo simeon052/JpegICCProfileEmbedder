@@ -47,26 +47,55 @@ namespace JpegICCProfileEmbedder
                 {
                     throw new InvalidDataException($"{fsICCProfile.Name} is too large, this is not supported size right now.");
                 }
+
+                // Thumbnailが保存されていた時のために、App0の実際のサイズを取得する。
                 byte[] App0 = new byte[SOIandApp0SizeWithoutThumbnail];
                 fsJpegImage.Read(App0, 0, SOIandApp0SizeWithoutThumbnail);
-                var App0HeaderSize = BitConverter.ToInt16(App0.Skip(SOI.Length + App0Marker.Length).Take(SegmentLengthSize).Reverse().ToArray(), 0); // Reverse is requried for endian
+                int App0HeaderSize;
+                if (BitConverter.IsLittleEndian) {
+                    App0HeaderSize = BitConverter.ToInt16(App0.Skip(SOI.Length + App0Marker.Length).Take(SegmentLengthSize).Reverse().ToArray(), 0); // Reverse is requried for endian
+                }
+                else
+                {
+                    App0HeaderSize = BitConverter.ToInt16(App0.Skip(SOI.Length + App0Marker.Length).Take(SegmentLengthSize).ToArray(), 0); 
+                }
 
-                byte[] ICCProfileSizeBuffer = new byte[SegmentLengthSize];
-                int ICCProfileSize = (int)(fsICCProfile.Length + ICC_PROFILE_Identify.Length + SegmentLengthSize);
-                ICCProfileSizeBuffer[0] = BitConverter.GetBytes(ICCProfileSize)[1];
-                ICCProfileSizeBuffer[1] = BitConverter.GetBytes(ICCProfileSize)[0];
+
+                // Size領域, Identifyを加えた、App2 Segmentのサイズを計算する
+                byte[] App2SegmentSizeBuffer = new byte[SegmentLengthSize];
+                int App2SegmentSize = (int)(fsICCProfile.Length + ICC_PROFILE_Identify.Length + SegmentLengthSize);
+                if (BitConverter.IsLittleEndian)
+                {
+                    App2SegmentSizeBuffer[0] = BitConverter.GetBytes(App2SegmentSize)[1];
+                    App2SegmentSizeBuffer[1] = BitConverter.GetBytes(App2SegmentSize)[0];
+                }
+                else
+                {
+                    App2SegmentSizeBuffer = BitConverter.GetBytes(App2SegmentSize);
+                }
 
                 fsJpegImage.Seek(0, SeekOrigin.Begin);
+
+                // Memry Streamに保存する
                 fsJpegImage.CopyTo(msJpegImageWithoutHeader);
                 fsICCProfile.CopyTo(msICCProfile);
+
+                // Color profileを埋め込んだ後のファイルサイズにする。
                 var expectedFileSize = fsJpegImage.Length + App2Marker.Length + SegmentLengthSize + ICC_PROFILE_Identify.Length + fsICCProfile.Length;
                 fsJpegImage.SetLength(expectedFileSize);
 
+                // SOI + APP0は変更されていないので、そのままのこすため、Skip
                 fsJpegImage.Seek(SOI.Length + App0Marker.Length + App0HeaderSize, SeekOrigin.Begin);
+                // App2 Markerの書き込み
                 fsJpegImage.Write(App2Marker, 0, App2Marker.Length);
-                fsJpegImage.Write(ICCProfileSizeBuffer, 0, SegmentLengthSize); // Set ICC profile size
+                // App2 Segment sizeの書き込み
+                fsJpegImage.Write(App2SegmentSizeBuffer, 0, SegmentLengthSize); // Set ICC profile size
+                // ICC Profile Identifierの書き込み
                 fsJpegImage.Write(ICC_PROFILE_Identify, 0, ICC_PROFILE_Identify.Length);
+                // ICC Profileそのものの書き込み
                 fsJpegImage.Write(msICCProfile.GetBuffer(), 0, (int)msICCProfile.Length);
+
+                // MemoryにあるJpeg fileのSOI, App0以外の部分を書き込み
                 var JpegImageDataLength = (int)(msJpegImageWithoutHeader.Length - (App0HeaderSize + SOI.Length + App0Marker.Length));
                 fsJpegImage.Write(msJpegImageWithoutHeader.GetBuffer(), SOI.Length + App0Marker.Length + App0HeaderSize, JpegImageDataLength);
 
