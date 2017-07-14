@@ -28,6 +28,19 @@ namespace JpegICCProfileEmbedder
 
         private static bool InsertICCProfileInJpegFile(string srcPath, string ICCProfilePath)
         {
+            bool result = false;
+            using (FileStream fsICCProfile = new FileStream(ICCProfilePath, FileMode.Open, FileAccess.Read))
+            {
+                var buffer = new byte[fsICCProfile.Length];
+                fsICCProfile.Read(buffer, 0, buffer.Length);
+                result = InsertICCProfileInJpegFile(srcPath, buffer);
+            }
+            return result;
+
+        }
+
+        private static bool InsertICCProfileInJpegFile(string srcPath, byte[] ICCProfileBuffer)
+        {
             // 
             // https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
             //
@@ -37,15 +50,13 @@ namespace JpegICCProfileEmbedder
             bool ret = false;
 
             using (FileStream fsJpegImage = new FileStream(srcPath, FileMode.Open, FileAccess.ReadWrite))
-            using (FileStream fsICCProfile = new FileStream(ICCProfilePath, FileMode.Open, FileAccess.ReadWrite))
             using (MemoryStream msJpegImageWithoutHeader = new MemoryStream())
-            using (MemoryStream msICCProfile = new MemoryStream())
             {
                 var originalFileSize = fsJpegImage.Length;
-                var originalICCProfileSize = fsICCProfile.Length;
-                if (fsICCProfile.Length > 0xFFFF) // HACK : サイズが、0xFFFFを超えた場合は、APP2 Segmentの分割が必要だが未対応
+                var originalICCProfileSize = ICCProfileBuffer.Length;
+                if (ICCProfileBuffer.Length > 0xFFFF) // HACK : サイズが、0xFFFFを超えた場合は、APP2 Segmentの分割が必要だが未対応
                 {
-                    throw new InvalidDataException($"{fsICCProfile.Name} is too large, this is not supported size right now.");
+                    throw new InvalidDataException($"ICCProfile is too large, this is not supported size right now.");
                 }
 
                 // Thumbnailが保存されていた時のために、App0の実際のサイズを取得する。
@@ -63,7 +74,7 @@ namespace JpegICCProfileEmbedder
 
                 // Size領域, Identifyを加えた、App2 Segmentのサイズを計算する
                 byte[] App2SegmentSizeBuffer = new byte[SegmentLengthSize];
-                int App2SegmentSize = (int)(fsICCProfile.Length + ICC_PROFILE_Identify.Length + SegmentLengthSize);
+                int App2SegmentSize = (int)(ICCProfileBuffer.Length + ICC_PROFILE_Identify.Length + SegmentLengthSize);
                 if (BitConverter.IsLittleEndian)
                 {
                     App2SegmentSizeBuffer[0] = BitConverter.GetBytes(App2SegmentSize)[1];
@@ -78,10 +89,9 @@ namespace JpegICCProfileEmbedder
 
                 // Memry Streamに保存する
                 fsJpegImage.CopyTo(msJpegImageWithoutHeader);
-                fsICCProfile.CopyTo(msICCProfile);
 
                 // Color profileを埋め込んだ後のファイルサイズにする。
-                var expectedFileSize = fsJpegImage.Length + App2Marker.Length + SegmentLengthSize + ICC_PROFILE_Identify.Length + fsICCProfile.Length;
+                var expectedFileSize = fsJpegImage.Length + App2Marker.Length + SegmentLengthSize + ICC_PROFILE_Identify.Length + ICCProfileBuffer.Length;
                 fsJpegImage.SetLength(expectedFileSize);
 
                 // SOI + APP0は変更されていないので、そのままのこすため、Skip
@@ -93,7 +103,7 @@ namespace JpegICCProfileEmbedder
                 // ICC Profile Identifierの書き込み
                 fsJpegImage.Write(ICC_PROFILE_Identify, 0, ICC_PROFILE_Identify.Length);
                 // ICC Profileそのものの書き込み
-                fsJpegImage.Write(msICCProfile.GetBuffer(), 0, (int)msICCProfile.Length);
+                fsJpegImage.Write(ICCProfileBuffer, 0, (int)ICCProfileBuffer.Length);
 
                 // MemoryにあるJpeg fileのSOI, App0以外の部分を書き込み
                 var JpegImageDataLength = (int)(msJpegImageWithoutHeader.Length - (App0HeaderSize + SOI.Length + App0Marker.Length));
@@ -108,8 +118,8 @@ namespace JpegICCProfileEmbedder
             }
             return ret;
         }
- 
-       private static bool RestoreICCProfileFromJpegFile(string srcPath, string ICCProfilePath)
+#region RestoreICCProfileByNativeAPI
+        private static bool RestoreICCProfileFromJpegFileByNativeApi(string srcPath, string ICCProfilePath)
         {
             using (var img = new Bitmap(srcPath))
             {
@@ -132,6 +142,8 @@ namespace JpegICCProfileEmbedder
             }
             return true;
         }
+#endregion
+
 
     }
 }
