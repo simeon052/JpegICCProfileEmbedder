@@ -17,7 +17,7 @@ namespace JpegICCProfileEmbedder
             {
                 // ICCProfileHandlerForJpeg.InsertICCProfileInJpegFile(args[0], args[1]);
                 //                RestoreICCProfileFromJpegFile(args[0], args[1]);
-                ICCProfileHandlerForJpeg.RestoreICCProfileFromJpegFile(args[0]);
+                ICCProfileHandlerForJpeg.RestoreICCProfileFromJpegFile(args[0], @"Q:\Data\Projects\JpegHeader\restored.icc" );
             }
         }
 

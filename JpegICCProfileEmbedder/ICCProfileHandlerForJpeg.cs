@@ -105,6 +105,18 @@ namespace JpegICCProfileEmbedder
             return ret;
         }
 
+        public static bool RestoreICCProfileFromJpegFile(string srcPath, string ICCProfilePath)
+        {
+            using (var fsICCProfile = new FileStream(ICCProfilePath, FileMode.Create, FileAccess.Write))
+            {
+                var buffer = RestoreICCProfileFromJpegFile(srcPath);
+                fsICCProfile.Write(buffer, 0, buffer.Length);
+            }
+
+            return true;
+        }
+
+
         public static byte[] RestoreICCProfileFromJpegFile(string srcPath)
         {
             //
@@ -115,32 +127,32 @@ namespace JpegICCProfileEmbedder
             {
                 var originalFileSize = fsJpegImage.Length;
                 int b;
-                byte[] ICCProfile = null;
+                byte[] ICCProfileBuffer = null;
 
                 while((b = fsJpegImage.ReadByte()) > -1 )
                 {
-                    if(b == App2Marker[1])
+                    if(b == App2Marker[1]) // Search App2 segment
                     {
                         var bd = new Byte[ ICC_PROFILE_Identify.Length];
-                        fsJpegImage.Seek(SegmentLengthSize, SeekOrigin.Current);
-                        fsJpegImage.Read(bd, 0, bd.Length);
+                        fsJpegImage.Seek(SegmentLengthSize, SeekOrigin.Current); // Segment lengthの格納場所を飛ばす
+                        fsJpegImage.Read(bd, 0, bd.Length); // ICC ProfileのIdetifyを比較
                         if(System.Linq.Enumerable.SequenceEqual (bd.Take (ICC_PROFILE_Identify.Length), ICC_PROFILE_Identify))
                         {
                             System.Diagnostics.Debug.WriteLine($"ICC_PROFILE is found at {fsJpegImage.Position}");
-                            const int ICCProfileSizeLenght = sizeof(Int32);
-                            var ICCProfileSizeBuf = new byte[ICCProfileSizeLenght];
-                            fsJpegImage.Read(ICCProfileSizeBuf, 0, ICCProfileSizeLenght);
-                            int ICCProfileSize = BitConverter.ToInt32(BitConverter.IsLittleEndian ? ICCProfileSizeBuf.Reverse().ToArray() : ICCProfileSizeBuf, 0);
-                            fsJpegImage.Seek(-ICCProfileSizeLenght, SeekOrigin.Current);
-                            ICCProfile = new byte[ICCProfileSize];
-                            fsJpegImage.Read(ICCProfile, 0, ICCProfileSize);
-                            break;
+                            const int ICCProfileSizeLength = sizeof(Int32);
+                            var ICCProfileSizeBuffer = new byte[ICCProfileSizeLength];
+                            fsJpegImage.Read(ICCProfileSizeBuffer, 0, ICCProfileSizeLength);
+                            int ICCProfileSize = BitConverter.ToInt32(BitConverter.IsLittleEndian ? ICCProfileSizeBuffer.Reverse().ToArray() : ICCProfileSizeBuffer, 0);
+                            fsJpegImage.Seek(-ICCProfileSizeLength, SeekOrigin.Current);
+                            ICCProfileBuffer = new byte[ICCProfileSize];
+                            fsJpegImage.Read(ICCProfileBuffer, 0, ICCProfileSize);
+                            return ICCProfileBuffer;
                         }
                         else
                         {
+                            // App2でもICC_PROFILEのIdentifyが一致しなかったら、巻き戻して再検索
                             fsJpegImage.Seek(-(SegmentLengthSize + ICC_PROFILE_Identify.Length), SeekOrigin.Current);
                         }
-                        return ICCProfile;
                     }
 
                 }
