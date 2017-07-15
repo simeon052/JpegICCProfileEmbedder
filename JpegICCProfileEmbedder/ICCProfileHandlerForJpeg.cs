@@ -15,6 +15,7 @@ namespace JpegICCProfileEmbedder
         static int SOIandApp0SizeWithoutThumbnail = SOI.Length + App0Marker.Length + 16; // SOI + APP0 segment size without Thumbnail
         static int SegmentLengthSize = 2; // Segment size is 16 bytes
 
+        //
         public static bool InsertICCProfileInJpegFile(string srcPath, string ICCProfilePath)
         {
             bool result = false;
@@ -27,6 +28,12 @@ namespace JpegICCProfileEmbedder
             return result;
         }
 
+        /// <summary>
+        /// memory上のICC Profileを指定のJpegファイルに埋め込む
+        /// </summary>
+        /// <param name="srcPath"></param>
+        /// <param name="ICCProfileBuffer"></param>
+        /// <returns></returns>
         public static bool InsertICCProfileInJpegFile(string srcPath, byte[] ICCProfileBuffer)
         {
             // 
@@ -105,6 +112,12 @@ namespace JpegICCProfileEmbedder
             return ret;
         }
 
+        /// <summary>
+        /// Jpegファイルから、ICC Profileを探して、ファイルとして保存する。
+        /// </summary>
+        /// <param name="srcPath"></param>
+        /// <param name="ICCProfilePath"></param>
+        /// <returns></returns>
         public static bool RestoreICCProfileFromJpegFile(string srcPath, string ICCProfilePath)
         {
             using (var fsICCProfile = new FileStream(ICCProfilePath, FileMode.Create, FileAccess.Write))
@@ -116,7 +129,11 @@ namespace JpegICCProfileEmbedder
             return true;
         }
 
-
+        /// <summary>
+        /// Jpegファイルから、ICC Profileを探して取り出す
+        /// </summary>
+        /// <param name="srcPath"></param>
+        /// <returns></returns>
         public static byte[] RestoreICCProfileFromJpegFile(string srcPath)
         {
             //
@@ -129,9 +146,10 @@ namespace JpegICCProfileEmbedder
                 int b;
                 byte[] ICCProfileBuffer = null;
 
+                // TODO : 複数Segmentに分割されたICC Profileには未対応
                 while((b = fsJpegImage.ReadByte()) > -1 )
                 {
-                    if(b == App2Marker[1]) // Search App2 segment
+                    if(b == App2Marker[1]) // App2 segment Markerの2byte目が一致するまで一バイトごと読む
                     {
                         var bd = new Byte[ ICC_PROFILE_Identify.Length];
                         fsJpegImage.Seek(SegmentLengthSize, SeekOrigin.Current); // Segment lengthの格納場所を飛ばす
@@ -139,10 +157,15 @@ namespace JpegICCProfileEmbedder
                         if(System.Linq.Enumerable.SequenceEqual (bd.Take (ICC_PROFILE_Identify.Length), ICC_PROFILE_Identify))
                         {
                             System.Diagnostics.Debug.WriteLine($"ICC_PROFILE is found at {fsJpegImage.Position}");
+
+                            // ICC Profileサイズの取得
                             const int ICCProfileSizeLength = sizeof(Int32);
                             var ICCProfileSizeBuffer = new byte[ICCProfileSizeLength];
                             fsJpegImage.Read(ICCProfileSizeBuffer, 0, ICCProfileSizeLength);
                             int ICCProfileSize = BitConverter.ToInt32(BitConverter.IsLittleEndian ? ICCProfileSizeBuffer.Reverse().ToArray() : ICCProfileSizeBuffer, 0);
+
+
+                            // ICC Profileの取得
                             fsJpegImage.Seek(-ICCProfileSizeLength, SeekOrigin.Current);
                             ICCProfileBuffer = new byte[ICCProfileSize];
                             fsJpegImage.Read(ICCProfileBuffer, 0, ICCProfileSize);
