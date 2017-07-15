@@ -4,6 +4,13 @@ using System.Linq;
 
 namespace JpegICCProfileEmbedder
 {
+    /// <summary>
+    /// Jpeg内のICC Profile操作
+    /// http://hp.vector.co.jp/authors/VA032610/operation/MessageList.htm
+    /// https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
+    /// 
+    ///
+    /// </summary>
     public class ICCProfileHandlerForJpeg
     {
         static byte[] SOI = { 0xFF, 0xD8 }; // Start of image segment(SOI)
@@ -13,7 +20,7 @@ namespace JpegICCProfileEmbedder
         static byte[] JFIFIdentify = { 0x4A, 0x46, 0x49, 0x46, 0x00 }; // "JFIF\0"
         static byte[] ICC_PROFILE_Identify = { 0x49, 0x43, 0x43, 0x5F, 0x50, 0x52, 0x4f, 0x46, 0x49, 0x4C, 0x45, 0x00, 0x01, 0x01 }; // "ICC_PROFILE\0"
         static int SOIandApp0SizeWithoutThumbnail = SOI.Length + App0Marker.Length + 16; // SOI + APP0 segment size without Thumbnail
-        static int SegmentLengthSize = 2; // Segment size is 16 bytes
+        static int SegmentLengthSize = 2; // Segment size is 2 bytes
 
         //
         public static bool InsertICCProfileInJpegFile(string srcPath, string ICCProfilePath)
@@ -36,9 +43,7 @@ namespace JpegICCProfileEmbedder
         /// <returns></returns>
         public static bool InsertICCProfileInJpegFile(string srcPath, byte[] ICCProfileBuffer)
         {
-            // 
-            // https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
-            //
+            // HACK : ICC Color Profileのサイズが、0xFFFFを超えた場合は、APP2 Segmentの分割が必要だが未対応
             bool ret = false;
 
             using (FileStream fsJpegImage = new FileStream(srcPath, FileMode.Open, FileAccess.ReadWrite))
@@ -46,7 +51,7 @@ namespace JpegICCProfileEmbedder
             {
                 var originalFileSize = fsJpegImage.Length;
                 var originalICCProfileSize = ICCProfileBuffer.Length;
-                if (ICCProfileBuffer.Length > 0xFFFF) // HACK : サイズが、0xFFFFを超えた場合は、APP2 Segmentの分割が必要だが未対応
+                if (ICCProfileBuffer.Length > 0xFFFF)
                 {
                     throw new InvalidDataException($"ICCProfile is too large, this is not supported size right now.");
                 }
@@ -136,10 +141,6 @@ namespace JpegICCProfileEmbedder
         /// <returns></returns>
         public static byte[] RestoreICCProfileFromJpegFile(string srcPath)
         {
-            //
-            // https://en.wikipedia.org/wiki/JPEG_File_Interchange_Format
-            //
-
             using (FileStream fsJpegImage = new FileStream(srcPath, FileMode.Open, FileAccess.ReadWrite))
             {
                 var originalFileSize = fsJpegImage.Length;
@@ -181,8 +182,6 @@ namespace JpegICCProfileEmbedder
                 }
 
             }
-
-
             return null;
         }
     }
