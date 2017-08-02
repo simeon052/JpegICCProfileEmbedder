@@ -17,7 +17,10 @@ namespace JpegICCProfileEmbedder
             {
                 // ICCProfileHandlerForJpeg.InsertICCProfileInJpegFile(args[0], args[1]);
                 //                RestoreICCProfileFromJpegFile(args[0], args[1]);
-                ICCProfileHandlerForJpeg.RestoreICCProfileFromJpegFile(args[0], @"Q:\Data\Projects\JpegHeader\restored.icc" );
+                //   ICCProfileHandlerForJpeg.RestoreICCProfileFromJpegFile(args[0], @"Q:\Data\Projects\JpegHeader\restored.icc" );
+                var (data, type, crc, size) = PngChunkHandler.Restore(args[0], PngChunkHandler.ChunkType.pHYs);
+                var (dpix, dpiy) = PngChunkHandler.GetDPIformPHYS(data);
+                ;
             }
         }
 
