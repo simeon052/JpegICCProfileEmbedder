@@ -44,22 +44,47 @@ namespace JpegICCProfileEmbedder
         static byte[] sRGB = { 0x73, 0x52, 0x47, 0x42 }; // sRGB Chunk type
         static byte[] pHYs = { 0x70, 0x48, 0x59, 0x73 }; // pHYs Chunk type
 
-        public static (int, int)GetDPIformPHYS(byte[] buf)
+
+        public static (float, float)GetDPIformPHYS(string filePath)
+        {
+            var (data, type, crc, size) = PngChunkHandler.Restore(filePath, PngChunkHandler.ChunkType.pHYs);
+            return PngChunkHandler.GetDPIformPHYS(data);
+        }
+
+        private static (float, float)GetDPIformPHYS(byte[] buf)
         {
             if(buf.Count() != 9)
             {
                 throw new InvalidDataException();
             }
 
-            Int32 dpiX = 0;
-            Int32 dpiY = 0;
+            float dpiX = 0;
+            float dpiY = 0;
 
             int dotPerMeter_X = BitConverter.ToInt32(BitConverter.IsLittleEndian ? buf.Take(4).Reverse().ToArray() : buf.Take(4).ToArray(), 0);
             int dotPerMeter_Y = BitConverter.ToInt32(BitConverter.IsLittleEndian ? buf.Skip(4).Take(4).Reverse().ToArray() : buf.Skip(4).Take(4).ToArray(), 0);
             int unit = buf[8];
             System.Diagnostics.Debug.WriteLine($"{dotPerMeter_X} x {dotPerMeter_Y} {(unit == 1 ? "Dot/Meter" : "Unknown")}");
 
+            if(unit != 1)
+            {
+                throw new InvalidDataException($"Unit is unknown.");
+            }
+
+            dpiX = DpmToDpi(dotPerMeter_X);
+            dpiY = DpmToDpi(dotPerMeter_Y);
+
+            System.Diagnostics.Debug.WriteLine($"{dpiX} x {dpiY} dot/Inch");
+
             return (dpiX, dpiY);
+        }
+
+
+        // 1メートル = 39.3701 inch
+        static float DpmToDpi(int dpm)
+        {
+            return (float)(dpm) / 39.370113f;
+
         }
 
 
@@ -241,9 +266,33 @@ namespace JpegICCProfileEmbedder
                             // Chunk Typeが一致しなかったら、巻き戻して再検索
                             fsSrcImage.Seek(-(ChunkType.Length), SeekOrigin.Current);
                         }
+                    }else if(b == IDAT[0])
+                    {
+                        var iDatChunkType = new Byte[ChunkTypeSize];
+                        fsSrcImage.Seek(-1, SeekOrigin.Current);
+                        fsSrcImage.Read(iDatChunkType, 0, ChunkTypeSize);
+
+                        if (System.Linq.Enumerable.SequenceEqual(iDatChunkType.Take(ChunkTypeSize), IDAT))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"IDAT is found.");
+                            switch (type)
+                            {
+                                case ChunkType.iCCP:
+                                case ChunkType.sRGB:
+                                case ChunkType.pHYs:
+                                    // これらのChukは、IDATの前にあるはずなので、IDatが見つかったらそこで終了
+                                    throw new ArgumentException($"{type} is not found, before IDAT.");
+                                default:
+                                    // Chunk Typeが一致しなかったら、巻き戻して再検索
+                                    fsSrcImage.Seek(-(ChunkTypeSize), SeekOrigin.Current);
+                                    break;
+                            }
+                        }
+
                     }
                 }
             }
+            System.Diagnostics.Debug.WriteLine($"Chunk isn't found.");
             return (null, null, null, 0);
         }
     }
