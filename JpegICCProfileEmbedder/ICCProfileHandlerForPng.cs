@@ -137,7 +137,7 @@ namespace JpegICCProfileEmbedder
                 var totalChunkLength = ChunkLengthSize + ChunkTypeSize + ChunkData.Length + ChunkCRCSize;
 
                 // Chunk Data Lengthの書き込み
-                byte[] lengthBuf =                BitConverter.GetBytes((Int32)ChunkData.Length);
+                byte[] lengthBuf = BitConverter.GetBytes((Int32)ChunkData.Length);
                 fsImage.Write(BitConverter.IsLittleEndian ? lengthBuf.Reverse().ToArray() : lengthBuf, 0, (int)ChunkLengthSize);
 
                 // ChunkTypeの書き込み
@@ -148,10 +148,10 @@ namespace JpegICCProfileEmbedder
 
                 // ChunkCRCの書き込み
                 fsImage.Write(ChunkCRC, 0, (int)ChunkCRC.Length);
-                var current = (int)fsImage.Position;
+
                 // MemoryにあるJpeg fileのSOI, App0以外の部分を書き込み
                 var remainImageDataLength = (int)(msImageWithoutHeader.Length - (PNG_SignatureSize + IHDR_ChunkSize));
-                fsImage.Write(msImageWithoutHeader.GetBuffer(), current, remainImageDataLength);
+                fsImage.Write(msImageWithoutHeader.GetBuffer(), PNG_SignatureSize + IHDR_ChunkSize, remainImageDataLength);
 
                 ret = true;
             }
