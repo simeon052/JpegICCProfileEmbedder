@@ -36,7 +36,7 @@ namespace JpegICCProfileEmbedder
         const int ChunkLengthSize = 4;
         const int ChunkCRCSize = 4;
 
-        static int IHDR_ChunkSize = 0x13; // 
+        static int IHDR_ChunkSize = 25; // 
         static byte[] IHDR = { 0x49, 0x48, 0x44, 0x52 }; // IHDR Chunk type
 
         static byte[] IDAT = { 0x49, 0x44, 0x41, 0x54 }; // IDAT Chunk type
@@ -134,6 +134,12 @@ namespace JpegICCProfileEmbedder
                 // PNG Signature / IHDR Chunkをとばす
                 fsImage.Seek(PNG_SignatureSize + IHDR_ChunkSize, SeekOrigin.Begin);
 
+                var totalChunkLength = ChunkLengthSize + ChunkTypeSize + ChunkData.Length + ChunkCRCSize;
+
+                // Chunk Data Lengthの書き込み
+                byte[] lengthBuf =                BitConverter.GetBytes((Int32)ChunkData.Length);
+                fsImage.Write(BitConverter.IsLittleEndian ? lengthBuf.Reverse().ToArray() : lengthBuf, 0, (int)ChunkLengthSize);
+
                 // ChunkTypeの書き込み
                 fsImage.Write(ChunkType, 0, (int)ChunkType.Length);
 
@@ -142,10 +148,10 @@ namespace JpegICCProfileEmbedder
 
                 // ChunkCRCの書き込み
                 fsImage.Write(ChunkCRC, 0, (int)ChunkCRC.Length);
-
+                var current = (int)fsImage.Position;
                 // MemoryにあるJpeg fileのSOI, App0以外の部分を書き込み
                 var remainImageDataLength = (int)(msImageWithoutHeader.Length - (PNG_SignatureSize + IHDR_ChunkSize));
-                fsImage.Write(msImageWithoutHeader.GetBuffer(), PNG_SignatureSize + IHDR_ChunkSize + ChunkType.Length + ChunkData.Length + ChunkCRC.Length, remainImageDataLength);
+                fsImage.Write(msImageWithoutHeader.GetBuffer(), current, remainImageDataLength);
 
                 ret = true;
             }
@@ -205,6 +211,7 @@ namespace JpegICCProfileEmbedder
                 // TODO : IDATは先頭のChunkのみ
                 while((b = fsSrcImage.ReadByte()) > -1 )
                 {
+                    System.Diagnostics.Debug.WriteLine($"{fsSrcImage.Position}");
                     if(b == chunk[0]) // iCCP 1st byte
                     {
                         var ChunkType = new Byte[ chunk.Length];
@@ -234,7 +241,7 @@ namespace JpegICCProfileEmbedder
                         else
                         {
                             // Chunk Typeが一致しなかったら、巻き戻して再検索
-                            fsSrcImage.Seek(-(ChunkType.Length), SeekOrigin.Current);
+                            fsSrcImage.Seek(-(ChunkType.Length - 1), SeekOrigin.Current);
                         }
                     }else if(b == IDAT[0])
                     {
