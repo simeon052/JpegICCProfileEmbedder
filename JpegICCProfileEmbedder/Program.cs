@@ -13,7 +13,7 @@ namespace JpegICCProfileEmbedder
     {
         static void Main(string[] args)
         {
-            if (args.Count() > 1)
+            if (args.Count() > 3)
             {
                 // ICCProfileHandlerForJpeg.InsertICCProfileInJpegFile(args[0], args[1]);
                 //                RestoreICCProfileFromJpegFile(args[0], args[1]);
@@ -22,6 +22,11 @@ namespace JpegICCProfileEmbedder
                 System.Console.WriteLine($"{dpix} x {dpiy}");
                 var (data, type, crc, size) = PngChunkHandler.Restore(args[0], PngChunkHandler.ChunkType.iCCP);
                 PngChunkHandler.Insert(args[1], type, data, crc);
+
+                var result = PngChunkHandler.Restore(args[0], args[2]);
+                PngChunkHandler.Insert(args[3], args[2]);
+
+                PngChunkHandler.Insert_ICCProfile(args[5], args[4]);
             }
         }
 
